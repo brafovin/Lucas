@@ -1,250 +1,247 @@
-const cv=document.getElementById('game'),ctx=cv.getContext('2d');
-const COLS=25,ROWS=19,T=28;cv.width=COLS*T;cv.height=ROWS*T;
+const cv=document.getElementById('game');
+const rn=new THREE.WebGLRenderer({canvas:cv,antialias:false});
+rn.setPixelRatio(window.devicePixelRatio);rn.setSize(innerWidth,innerHeight);
+const sc=new THREE.Scene();sc.background=new THREE.Color(0x000000);
+sc.fog=new THREE.Fog(0x000000,1,14);
+const cam=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,60);sc.add(cam);
+sc.add(new THREE.AmbientLight(0x0a0a12,0.6));
+const moon=new THREE.DirectionalLight(0x3344aa,0.25);moon.position.set(10,30,10);sc.add(moon);
+const fl=new THREE.SpotLight(0xfff1c0,3.5,13,Math.PI/7,0.45,1.6);
+cam.add(fl);fl.target.position.set(0,0,-1);cam.add(fl.target);
 
-const MAP=[
-"#########################",
-"#.......................#",
-"#.......................#",
-"#.......................#",
-"############d############",
-"#....#.........#........#",
-"#....#.........#........#",
-"#..............#........#",
-"#....#..................#",
-"#....#.........#........#",
-"######.........##########",
-"#.......................#",
-"#.......................#",
-"#.......................#",
-"############D############",
-"#.......................#",
-"#.......................#",
-"#.......................#",
-"#########################"];
+const MAP=["#########################","#.......................#","#.......................#","#.......................#","############d############","#....#.........#........#","#....#.........#........#","#..............#........#","#....#..................#","#....#.........#........#","######.........##########","#.......................#","#.......................#","#.......................#","############D############","#.......................#","#.......................#","#.......................#","#########################"];
+const COLS=25,ROWS=19,H=3;
 
-const S={px:12*T+T/2,py:2*T+T/2,dir:'down',keys:{},phase:'outside',
-  sawBlood:false,broken:false,visited:new Set(),killer:null,
-  inCloset:false,hideTime:0,needHide:7,killerLeft:false,
-  msg:'',msgT:0,prompt:null,over:false,ended:false};
+const fMat=new THREE.MeshLambertMaterial({color:0x2b211a});
+const oMat=new THREE.MeshLambertMaterial({color:0x0a0d18});
+const bMat=new THREE.MeshLambertMaterial({color:0x2a1010});
+const cMat=new THREE.MeshLambertMaterial({color:0x1a1510});
+const wMat=new THREE.MeshLambertMaterial({color:0x5a5550});
+const dMat=new THREE.MeshLambertMaterial({color:0x3a1a0a});
+const pg=new THREE.PlaneGeometry(1,1);
+const bg=new THREE.BoxGeometry(1,H,1);
 
-const P={
-  living:{x:2.5*T,y:7*T},kitchen:{x:20*T,y:7*T},
-  lockedDoor:{x:12*T+T/2,y:14*T+T/2},
-  closet:{x:4*T,y:11*T+T/2},
-  car:{x:12*T+T/2,y:2*T+T/2},
-  frontDoor:{x:12*T+T/2,y:4*T+T/2}};
+for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+  const m=new THREE.Mesh(pg,r<4?oMat:(r>=15?bMat:fMat));
+  m.rotation.x=-Math.PI/2;m.position.set(c+0.5,0,r+0.5);sc.add(m);
+  if(r>=4){const cm=new THREE.Mesh(pg,cMat);cm.rotation.x=Math.PI/2;cm.position.set(c+0.5,H,r+0.5);sc.add(cm)}
+}
+const lockedMeshes=[];
+for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+  const t=MAP[r][c];
+  if(t==='#'){const m=new THREE.Mesh(bg,wMat);m.position.set(c+0.5,H/2,r+0.5);sc.add(m)}
+  else if(t==='D'){const m=new THREE.Mesh(bg,dMat);m.position.set(c+0.5,H/2,r+0.5);sc.add(m);lockedMeshes.push(m)}
+}
 
-function dist(p){return Math.hypot(S.px-p.x,S.py-p.y)}
-function tileAt(x,y){const c=Math.floor(x/T),r=Math.floor(y/T);
-  if(r<0||r>=ROWS||c<0||c>=COLS)return'#';return MAP[r][c]}
-function walk(x,y){const t=tileAt(x,y);if(t==='#')return false;
-  if(t==='D'&&!S.broken)return false;return true}
-function moveE(e,dx,dy,r=10){
-  if(dx){const nx=e.x+dx;if(walk(nx-r,e.y-r)&&walk(nx+r,e.y-r)&&walk(nx-r,e.y+r)&&walk(nx+r,e.y+r))e.x=nx}
-  if(dy){const ny=e.y+dy;if(walk(e.x-r,ny-r)&&walk(e.x+r,ny-r)&&walk(e.x-r,ny+r)&&walk(e.x+r,ny+r))e.y=ny}}
-function msg(t,d=180){S.msg=t;S.msgT=d}
+const S={px:12.5,pz:2.5,py:1.6,yaw:Math.PI,pitch:0,keys:{},phase:'outside',sawBlood:false,broken:false,visited:new Set(),killer:null,inCloset:false,hideTime:0,needHide:7,killerLeft:false,msg:'',msgT:0,over:false};
+cam.position.set(S.px,S.py,S.pz);cam.rotation.order='YXZ';
 
-function updPlayer(){
-  if(S.over||S.inCloset)return;
-  let dx=0,dy=0,sp=2.0;
-  if(S.keys.w||S.keys.arrowup)dy-=sp;
-  if(S.keys.s||S.keys.arrowdown)dy+=sp;
-  if(S.keys.a||S.keys.arrowleft)dx-=sp;
-  if(S.keys.d||S.keys.arrowright)dx+=sp;
-  if(dx&&dy){dx/=1.414;dy/=1.414}
-  if(dy<0)S.dir='up';else if(dy>0)S.dir='down';
-  else if(dx<0)S.dir='left';else if(dx>0)S.dir='right';
-  const e={x:S.px,y:S.py};moveE(e,dx,dy);S.px=e.x;S.py=e.y;
+const P={living:{x:2.5,z:7},kitchen:{x:20,z:7},lockedDoor:{x:12.5,z:14.5},closet:{x:4,z:11.5},frontDoor:{x:12.5,z:4.5},car:{x:12.5,z:2}};
+function D(p){return Math.hypot(S.px-p.x,S.pz-p.z)}
 
-  if(S.phase==='outside'&&S.py>5*T){S.phase='exploring';
-    msg("Du betrittst das Haus. Die Luft ist stickig.",200)}
-  if(S.phase==='exploring'){
-    if(dist(P.living)<60&&!S.visited.has('l')){S.visited.add('l');
-      msg("Wohnzimmer: leer. Fernseher flimmert ohne Ton. Zertretene Brille am Boden.",220)}
-    if(dist(P.kitchen)<60&&!S.visited.has('k')){S.visited.add('k');
-      msg("Küche: leer. Wasser kocht noch. Ein Messer fehlt aus dem Block.",220)}}
-  if(S.phase==='breaking'&&S.py>15*T&&!S.killer){
-    S.killer={x:12*T+T/2,y:17*T};S.phase='chase';
-    msg("Der Killer sieht dich! LAUF! Versteck dich im KLEIDERSCHRANK (links im Flur)!",320)}
-  if(S.phase==='escaping'&&S.py<4*T){S.phase='outsideEnd';
-    msg("Draußen im Regen. Rufe Verstärkung am Streifenwagen!",240)}}
+// Closet
+const cg=new THREE.Group();
+const cb=new THREE.Mesh(new THREE.BoxGeometry(0.9,2.3,0.6),new THREE.MeshLambertMaterial({color:0x3a2418}));
+cb.position.y=1.15;cg.add(cb);
+const cd=new THREE.Mesh(new THREE.BoxGeometry(0.02,2.2,0.55),new THREE.MeshLambertMaterial({color:0x120700}));
+cd.position.set(0,1.15,0);cg.add(cd);
+cg.position.set(P.closet.x,0,P.closet.z);sc.add(cg);
 
-function updKiller(){
-  if(!S.killer)return;const k=S.killer,sp=1.4;
-  if(S.killerLeft){
-    const dx=P.frontDoor.x-k.x,dy=2*T-k.y,d=Math.hypot(dx,dy);
-    if(d<16){S.killer=null;msg("Die Haustür schlägt zu. Stille.",240);return}
-    moveE(k,(dx/d)*sp,(dy/d)*sp)}
-  else if(S.inCloset){
-    if(!k.t||Math.hypot(k.x-k.t.x,k.y-k.t.y)<8)
-      k.t={x:(6+Math.random()*14)*T,y:(11+Math.random()*3)*T};
-    const dx=k.t.x-k.x,dy=k.t.y-k.y,d=Math.hypot(dx,dy)||1;
-    moveE(k,(dx/d)*sp*0.6,(dy/d)*sp*0.6);
-    if(S.hideTime>=S.needHide){S.killerLeft=true;
-      msg("Schritte entfernen sich. Ein Reißverschluss. Die Haustür...",240)}}
-  else{
-    const dx=S.px-k.x,dy=S.py-k.y,d=Math.hypot(dx,dy);
-    if(d<15){S.over=true;S.phase='dead';
-      msg("Der Killer hat dich erwischt. GAME OVER. (Neustart klicken)",99999);return}
-    moveE(k,(dx/d)*sp,(dy/d)*sp)}}
+// Car
+const carG=new THREE.Group();
+const carB=new THREE.Mesh(new THREE.BoxGeometry(0.9,0.55,1.8),new THREE.MeshLambertMaterial({color:0x1d3470}));
+carB.position.y=0.27;carG.add(carB);
+const carT=new THREE.Mesh(new THREE.BoxGeometry(0.8,0.4,1),new THREE.MeshLambertMaterial({color:0x0d2050}));
+carT.position.y=0.75;carG.add(carT);
+const carL1=new THREE.PointLight(0xff0000,1,4);carL1.position.set(0,1.1,0);carG.add(carL1);
+const carL2=new THREE.PointLight(0x0066ff,1,4);carL2.position.set(0,1.1,0);carG.add(carL2);
+carG.position.set(P.car.x,0,P.car.z);sc.add(carG);
+
+// Furniture
+const sofa=new THREE.Mesh(new THREE.BoxGeometry(2,0.6,0.7),new THREE.MeshLambertMaterial({color:0x4a3a2a}));
+sofa.position.set(2.5,0.3,5.8);sc.add(sofa);
+const tv=new THREE.Mesh(new THREE.BoxGeometry(1.4,0.7,0.1),new THREE.MeshLambertMaterial({color:0x0a0a0a,emissive:0x223344,emissiveIntensity:0.8}));
+tv.position.set(2.5,1,8.7);sc.add(tv);
+const tvLight=new THREE.PointLight(0x4466aa,0.4,3);tvLight.position.set(2.5,1,8);sc.add(tvLight);
+const counter=new THREE.Mesh(new THREE.BoxGeometry(5,0.9,0.8),new THREE.MeshLambertMaterial({color:0x5a4a3a}));
+counter.position.set(19.5,0.45,5.8);sc.add(counter);
+const stove=new THREE.Mesh(new THREE.BoxGeometry(0.8,0.95,0.7),new THREE.MeshLambertMaterial({color:0x1a1a1a}));
+stove.position.set(18,0.475,5.8);sc.add(stove);
+const stoveL=new THREE.PointLight(0xff5522,0.6,2);stoveL.position.set(18,1.1,5.8);sc.add(stoveL);
+const table=new THREE.Mesh(new THREE.BoxGeometry(1,0.8,0.6),new THREE.MeshLambertMaterial({color:0x4a3a2a}));
+table.position.set(10,0.4,6);sc.add(table);
+const cup=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,0.15,8),new THREE.MeshLambertMaterial({color:0xddccaa}));
+cup.position.set(10,0.88,6);sc.add(cup);
+
+// Body & blood
+const body=new THREE.Mesh(new THREE.BoxGeometry(0.8,0.35,1.8),new THREE.MeshLambertMaterial({color:0x666060}));
+body.position.set(12.5,0.17,16);body.visible=false;sc.add(body);
+const pool=new THREE.Mesh(new THREE.CircleGeometry(1.3,18),new THREE.MeshLambertMaterial({color:0x5a0505}));
+pool.rotation.x=-Math.PI/2;pool.position.set(12.5,0.02,16);pool.visible=false;sc.add(pool);
+const bloodTrail=[];
+for(let i=0;i<6;i++){
+  const b=new THREE.Mesh(new THREE.CircleGeometry(0.18,10),new THREE.MeshLambertMaterial({color:0x8a0000}));
+  b.rotation.x=-Math.PI/2;b.position.set(12.5+Math.sin(i*0.8)*0.35,0.02,14.3-i*0.25);
+  b.visible=false;sc.add(b);bloodTrail.push(b);
+}
+
+function spawnKiller(){
+  const g=new THREE.Group();
+  const b=new THREE.Mesh(new THREE.CapsuleGeometry(0.28,1.2,4,8),new THREE.MeshLambertMaterial({color:0x180808}));
+  b.position.y=0.9;g.add(b);
+  const h=new THREE.Mesh(new THREE.SphereGeometry(0.22,12,12),new THREE.MeshLambertMaterial({color:0x1a1000}));
+  h.position.y=1.72;g.add(h);
+  const k=new THREE.Mesh(new THREE.BoxGeometry(0.05,0.06,0.4),new THREE.MeshLambertMaterial({color:0xcccccc}));
+  k.position.set(0.3,1,0.2);g.add(k);
+  const tip=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.07,0.05),new THREE.MeshLambertMaterial({color:0x990000}));
+  tip.position.set(0.3,1,0.4);g.add(tip);
+  g.position.set(12.5,0,16);sc.add(g);return g;
+}
+
+function msg(t,d){S.msg=t;S.msgT=d||200}
+
+function canMove(x,z,rad){
+  rad=rad||0.3;
+  for(const[dx,dz]of[[-rad,-rad],[rad,-rad],[-rad,rad],[rad,rad]]){
+    const col=Math.floor(x+dx),row=Math.floor(z+dz);
+    if(row<0||row>=ROWS||col<0||col>=COLS)return false;
+    const t=MAP[row][col];
+    if(t==='#')return false;
+    if(t==='D'&&!S.broken)return false;
+  }
+  return true;
+}
+function canMoveK(x,z){
+  const col=Math.floor(x),row=Math.floor(z);
+  if(row<0||row>=ROWS||col<0||col>=COLS)return false;
+  const t=MAP[row][col];if(t==='#')return false;return true;
+}
+
+function upd(){
+  if(S.msgT>0)S.msgT--;
+  if(!S.over&&!S.inCloset){
+    let dx=0,dz=0;const sp=0.065;
+    if(S.keys.w||S.keys.arrowup){dx-=Math.sin(S.yaw)*sp;dz-=Math.cos(S.yaw)*sp}
+    if(S.keys.s||S.keys.arrowdown){dx+=Math.sin(S.yaw)*sp;dz+=Math.cos(S.yaw)*sp}
+    if(S.keys.a||S.keys.arrowleft){dx-=Math.cos(S.yaw)*sp;dz+=Math.sin(S.yaw)*sp}
+    if(S.keys.d||S.keys.arrowright){dx+=Math.cos(S.yaw)*sp;dz-=Math.sin(S.yaw)*sp}
+    if(canMove(S.px+dx,S.pz))S.px+=dx;
+    if(canMove(S.px,S.pz+dz))S.pz+=dz;
+    cam.position.set(S.px,S.py,S.pz);
+    cam.rotation.set(S.pitch,S.yaw,0);
+
+    if(S.phase==='outside'&&S.pz>5){S.phase='exploring';msg("Du betrittst das Haus. Die Luft ist stickig.",220)}
+    if(S.phase==='exploring'){
+      if(D(P.living)<2.5&&!S.visited.has('l')){S.visited.add('l');msg("WOHNZIMMER: leer. Fernseher flimmert ohne Ton. Eine zertretene Brille auf dem Teppich.",240)}
+      if(D(P.kitchen)<2.5&&!S.visited.has('k')){S.visited.add('k');msg("KÜCHE: leer. Wasser kocht noch. Ein Messer fehlt aus dem Block.",240)}
+    }
+    if(S.phase==='breaking'&&S.pz>15&&!S.killer){
+      S.killer=spawnKiller();S.phase='chase';
+      msg("Der Killer dreht sich zu dir! LAUF! Kleiderschrank links im FLUR!",360);
+    }
+    if(S.phase==='escaping'&&S.pz<4){S.phase='outsideEnd';msg("Draußen im Regen. Rufe Verstärkung am STREIFENWAGEN!",260)}
+  }
+
+  if(S.killer){
+    const k=S.killer,sp=0.045;
+    if(S.killerLeft){
+      const dx=P.frontDoor.x-k.position.x,dz=2-k.position.z,d=Math.hypot(dx,dz);
+      if(d<0.5){sc.remove(k);S.killer=null;msg("Die Haustür schlägt zu. Stille.",260)}
+      else{const nx=k.position.x+(dx/d)*sp,nz=k.position.z+(dz/d)*sp;
+        if(canMoveK(nx,k.position.z))k.position.x=nx;
+        if(canMoveK(k.position.x,nz))k.position.z=nz;
+        k.rotation.y=Math.atan2(dx,dz);}
+    }else if(S.inCloset){
+      if(!k.userData.t||Math.hypot(k.position.x-k.userData.t.x,k.position.z-k.userData.t.z)<0.3)
+        k.userData.t={x:6+Math.random()*14,z:11+Math.random()*3};
+      const dx=k.userData.t.x-k.position.x,dz=k.userData.t.z-k.position.z,d=Math.hypot(dx,dz)||1;
+      const nx=k.position.x+(dx/d)*sp*0.6,nz=k.position.z+(dz/d)*sp*0.6;
+      if(canMoveK(nx,k.position.z))k.position.x=nx;
+      if(canMoveK(k.position.x,nz))k.position.z=nz;
+      k.rotation.y=Math.atan2(dx,dz);
+      if(S.hideTime>=S.needHide){S.killerLeft=true;msg("Schritte entfernen sich. Ein Reißverschluss. Die Haustür...",260)}
+    }else{
+      const dx=S.px-k.position.x,dz=S.pz-k.position.z,d=Math.hypot(dx,dz);
+      if(d<0.7){S.over=true;S.phase='dead';msg("Der Killer hat dich erwischt. GAME OVER. Klicke 'Neustart' (F5).",99999);}
+      else{const nx=k.position.x+(dx/d)*sp,nz=k.position.z+(dz/d)*sp;
+        if(canMoveK(nx,k.position.z))k.position.x=nx;
+        if(canMoveK(k.position.x,nz))k.position.z=nz;
+        k.rotation.y=Math.atan2(dx,dz);}
+    }
+  }
+
+  if(S.inCloset&&!S.killerLeft)S.hideTime+=1/60;
+
+  // Animations
+  const t=Date.now()*0.005;
+  carL1.intensity=Math.sin(t)>0?1:0.1;
+  carL2.intensity=Math.sin(t)<0?1:0.1;
+  tvLight.intensity=0.3+Math.random()*0.2;
+  stoveL.intensity=0.5+Math.sin(Date.now()*0.01)*0.1;
+}
 
 let lastE=0;
 function interact(){
   if(Date.now()-lastE<300||S.over)return;lastE=Date.now();
-  if(dist(P.closet)<32&&S.phase==='chase'){S.inCloset=true;S.phase='hiding';
-    msg("Du schließt die Schranktür. Dein Herz dröhnt.",200);return}
-  if(S.inCloset&&S.killerLeft){S.inCloset=false;S.phase='escaping';
-    msg("Du trittst vorsichtig aus dem Schrank. Zur Haustür!",200);return}
-  if(dist(P.lockedDoor)<50&&(S.phase==='exploring'||S.phase==='sawBlood')){
+  if(D(P.closet)<1.2&&S.phase==='chase'){S.inCloset=true;S.phase='hiding';msg("Du schließt die Schranktür. Dein Herz dröhnt.",240);return}
+  if(S.inCloset&&S.killerLeft){S.inCloset=false;S.phase='escaping';msg("Du trittst vorsichtig aus dem Schrank. Zur Haustür!",220);return}
+  if(D(P.lockedDoor)<2&&(S.phase==='exploring'||S.phase==='sawBlood')){
     if(!S.sawBlood){S.sawBlood=true;S.phase='sawBlood';
-      msg("Tür abgeschlossen. BLUTSTREIFEN am Boden, frisch. E erneut = eintreten.",360)}
-    else if(!S.broken){S.broken=true;S.phase='breaking';
+      bloodTrail.forEach(m=>m.visible=true);
+      msg("Die Tür ist abgeschlossen. BLUTSTREIFEN am Boden — frisch. Drücke E erneut zum EINTRETEN.",380);
+    }else if(!S.broken){S.broken=true;S.phase='breaking';
+      lockedMeshes.forEach(m=>m.visible=false);
+      body.visible=true;pool.visible=true;
       msg("Du trittst die Tür ein! Sie kracht nach innen!",200);
-      setTimeout(()=>msg("Eine Leiche. Darüber ein Mann mit blutiger Klinge. Er dreht sich zu dir!",260),1800)}
-    return}
-  if(dist(P.car)<40&&S.phase==='outsideEnd'){S.phase='ending';S.ended=true;S.over=true;
-    msg("★ VERSTÄRKUNG! Blaulicht im Regen. Ihr durchsucht das Haus — der Killer ist entkommen. Er läuft noch frei herum. ★",99999);return}}
+      setTimeout(()=>msg("Eine Leiche. Darüber ein Mann mit blutiger Klinge. Geh hinein.",280),1800);
+    }
+    return;
+  }
+  if(D(P.car)<2&&S.phase==='outsideEnd'){S.phase='ending';S.over=true;
+    msg("★ VERSTÄRKUNG! Blaulicht im Regen. Der Killer ist entkommen. Er läuft noch frei herum. ★",99999);return;
+  }
+}
 
-function drawTile(c,r){const t=MAP[r][c],x=c*T,y=r*T;
-  if(r<4){ctx.fillStyle='#0d1018';ctx.fillRect(x,y,T,T);
-    if((c+r)%2)ctx.fillRect(x,y,T,T);
-    ctx.fillStyle='rgba(120,140,160,0.1)';
-    ctx.fillRect(x+(Date.now()/30+c*7)%T,y+(Date.now()/20+r*11)%T,1,4)}
-  else if(r>=15){ctx.fillStyle='#2a1212';ctx.fillRect(x,y,T,T)}
-  else{ctx.fillStyle='#2b211a';ctx.fillRect(x,y,T,T);
-    ctx.strokeStyle='rgba(0,0,0,0.25)';ctx.beginPath();
-    ctx.moveTo(x,y+T/2);ctx.lineTo(x+T,y+T/2);ctx.stroke()}
-  if(t==='#'){const g=ctx.createLinearGradient(x,y,x,y+T);
-    g.addColorStop(0,'#4a4a4a');g.addColorStop(1,'#252525');
-    ctx.fillStyle=g;ctx.fillRect(x,y,T,T);
-    ctx.strokeStyle='#111';ctx.strokeRect(x,y,T,T)}
-  else if(t==='d'){ctx.fillStyle='#6b3a1a';ctx.fillRect(x,y,T,T);
-    ctx.fillStyle='#3a1a0a';ctx.fillRect(x+3,y+3,T-6,T-6);
-    ctx.fillStyle='#d4a060';ctx.fillRect(x+T-8,y+T/2-1,3,3)}
-  else if(t==='D'){if(S.broken){ctx.fillStyle='#150505';ctx.fillRect(x,y,T,T);
-      ctx.fillStyle='#5a3525';ctx.fillRect(x,y,4,T);ctx.fillRect(x+T-4,y,4,T);
-      ctx.fillRect(x+5,y,3,T/3);ctx.fillRect(x+T-9,y+T*2/3,3,T/3)}
-    else{ctx.fillStyle='#2a1a0a';ctx.fillRect(x,y,T,T);
-      ctx.fillStyle='#7a4a1a';ctx.fillRect(x+2,y+2,T-4,T-4);
-      ctx.fillStyle='#000';ctx.fillRect(x+T/2-1,y+T/2-1,3,5)}}}
+document.addEventListener('mousemove',e=>{
+  if(document.pointerLockElement===cv){
+    S.yaw-=e.movementX*0.002;
+    S.pitch-=e.movementY*0.002;
+    S.pitch=Math.max(-Math.PI/2+0.1,Math.min(Math.PI/2-0.1,S.pitch));
+  }
+});
+addEventListener('keydown',e=>{S.keys[e.key.toLowerCase()]=true;if(e.key.toLowerCase()==='e')interact()});
+addEventListener('keyup',e=>{S.keys[e.key.toLowerCase()]=false});
+addEventListener('resize',()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();rn.setSize(innerWidth,innerHeight)});
 
-function drawObj(){
-  if(!S.ended){const c=P.car;
-    ctx.fillStyle='#1d3470';ctx.fillRect(c.x-20,c.y-10,40,22);
-    ctx.fillStyle='#fff';ctx.fillRect(c.x-20,c.y-2,40,3);
-    ctx.fillStyle='#aacdff';ctx.fillRect(c.x-15,c.y-8,30,6);
-    const b=Math.floor(Date.now()/300)%2===0;
-    ctx.fillStyle=b?'#00f':'#f00';ctx.fillRect(c.x-7,c.y-13,5,3);
-    ctx.fillStyle=b?'#f00':'#00f';ctx.fillRect(c.x+2,c.y-13,5,3)}
-  ctx.fillStyle='rgba(200,200,180,0.18)';
-  ctx.font='bold 10px Courier New';ctx.textAlign='center';
-  ctx.fillText('WOHNZIMMER',2.5*T,7.5*T);
-  ctx.fillText('KÜCHE',20*T,7.5*T);
-  ctx.fillText('FLUR',14*T,12.5*T);
-  if(S.broken)ctx.fillText('MORDZIMMER',12*T,16.5*T);
-  ctx.textAlign='left';
-  // sofa
-  ctx.fillStyle='#4a3a2a';ctx.fillRect(1.5*T,5.3*T,3*T,T*0.8);
-  // tv
-  const fl=Math.random()<0.5?'#4a4a6a':'#2a2a3a';
-  ctx.fillStyle='#0a0a0a';ctx.fillRect(2*T,8.4*T,2*T,T*0.5);
-  ctx.fillStyle=fl;ctx.fillRect(2.1*T,8.45*T,1.8*T,T*0.4);
-  // kitchen counter
-  ctx.fillStyle='#5a4a3a';ctx.fillRect(16.5*T,5.3*T,6.8*T,T*0.8);
-  ctx.fillStyle='#2a2a2a';ctx.fillRect(18*T,5.5*T,T,T*0.5);
-  ctx.fillStyle='#ff6633';ctx.fillRect(18.25*T,5.6*T,T*0.5,T*0.3);
-  // closet
-  const cl=P.closet;
-  ctx.fillStyle='#3a2418';ctx.fillRect(cl.x-14,cl.y-16,28,32);
-  ctx.strokeStyle='#120700';ctx.lineWidth=2;ctx.strokeRect(cl.x-14,cl.y-16,28,32);
-  ctx.fillStyle='#120700';ctx.fillRect(cl.x-1,cl.y-14,2,28);
-  ctx.fillStyle='#d4a060';ctx.fillRect(cl.x+8,cl.y-2,3,4);
-  ctx.fillRect(cl.x-11,cl.y-2,3,4);
-  ctx.lineWidth=1;
-  // blood trail
-  if(S.sawBlood){ctx.fillStyle='rgba(140,0,0,0.85)';
-    const d=P.lockedDoor;
-    for(let i=0;i<8;i++){ctx.beginPath();
-      ctx.arc(d.x-2+Math.sin(i*1.3)*6,d.y-20-i*4,5-i*0.3,0,Math.PI*2);ctx.fill()}
-    ctx.fillRect(d.x-5,d.y-14,10,16)}
-  // body
-  if(S.broken){ctx.fillStyle='#5a0505';ctx.beginPath();
-    ctx.ellipse(12*T,16*T,22,12,0,0,Math.PI*2);ctx.fill();
-    ctx.fillStyle='#888';ctx.fillRect(12*T-10,16*T-6,20,12);
-    ctx.fillStyle='#e4c4a4';ctx.beginPath();
-    ctx.arc(12*T+10,16*T,5,0,Math.PI*2);ctx.fill()}}
+const startOv=document.getElementById('start-overlay');
+document.getElementById('start-btn').addEventListener('click',()=>{
+  startOv.classList.add('hidden');cv.requestPointerLock();
+  if(!S.msg)msg("22:47 — Lindenstraße 13. Finde die Person, die angerufen hat.",360);
+});
+document.addEventListener('pointerlockchange',()=>{
+  if(document.pointerLockElement!==cv&&!S.over)startOv.classList.remove('hidden');
+});
 
-function drawChar(x,y,dir,col,evil){
-  ctx.fillStyle='rgba(0,0,0,0.5)';ctx.beginPath();
-  ctx.ellipse(x,y+9,11,4,0,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle=col;ctx.beginPath();ctx.arc(x,y,10,0,Math.PI*2);ctx.fill();
-  let ox=0,oy=0;
-  if(dir==='up')oy=-4;else if(dir==='down')oy=4;
-  else if(dir==='left')ox=-4;else if(dir==='right')ox=4;
-  ctx.fillStyle=evil?'#1a0000':'#fcd';
-  ctx.beginPath();ctx.arc(x+ox,y+oy,4,0,Math.PI*2);ctx.fill();
-  if(!evil){ctx.fillStyle='#1d3470';ctx.fillRect(x-7,y-11,14,3);
-    ctx.fillStyle='#d4a02a';ctx.fillRect(x-1,y-10,2,2)}
-  else{ctx.fillStyle='#ccc';ctx.fillRect(x+8,y-1,10,2);
-    ctx.fillStyle='#a00';ctx.fillRect(x+16,y-1,2,2)}}
-
-function drawFog(){
-  const r=S.inCloset?0:(S.phase==='outside'?500:150);
-  if(r===0)return;
-  const g=ctx.createRadialGradient(S.px,S.py,30,S.px,S.py,r);
-  g.addColorStop(0,'rgba(0,0,0,0)');
-  g.addColorStop(0.65,'rgba(0,0,0,0.55)');
-  g.addColorStop(1,'rgba(0,0,0,0.94)');
-  ctx.fillStyle=g;ctx.fillRect(0,0,cv.width,cv.height)}
-
-function draw(){
-  ctx.fillStyle='#000';ctx.fillRect(0,0,cv.width,cv.height);
-  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)drawTile(c,r);
-  drawObj();
-  if(S.killer)drawChar(S.killer.x,S.killer.y,'down','#2a2a2a',true);
-  if(!S.inCloset)drawChar(S.px,S.py,S.dir,'#3d5a8a',false);
-  drawFog();
-  if(S.inCloset){ctx.fillStyle='rgba(0,0,0,0.9)';
-    ctx.fillRect(0,0,cv.width,cv.height);
-    ctx.fillStyle='#c00';ctx.font='bold 18px Courier New';ctx.textAlign='center';
-    ctx.fillText('Im Kleiderschrank',cv.width/2,50);
-    ctx.fillStyle='#aaa';ctx.font='13px Courier New';
-    if(!S.killerLeft){ctx.fillText('Halte still. Kein Geräusch.',cv.width/2,80);
-      ctx.fillText('Versteckt: '+S.hideTime.toFixed(1)+'s / '+S.needHide+'s',cv.width/2,110);
-      const bw=200,bh=10;ctx.fillStyle='#222';ctx.fillRect(cv.width/2-bw/2,125,bw,bh);
-      ctx.fillStyle='#c00';ctx.fillRect(cv.width/2-bw/2,125,bw*Math.min(1,S.hideTime/S.needHide),bh)}
-    else{ctx.fillStyle='#5a5';ctx.fillText('Er ist weg. Drücke E zum Herauskommen.',cv.width/2,80)}
-    ctx.textAlign='left'}}
+const msgEl=document.getElementById('message'),promptEl=document.getElementById('prompt'),phaseEl=document.getElementById('phase'),closetEl=document.getElementById('closet-view'),closetStat=document.getElementById('closet-status'),hideFill=document.getElementById('hide-fill');
+const labels={outside:'Ankunft',exploring:'Durchsuche das Haus',sawBlood:'Blutspur entdeckt',breaking:'Tür aufgebrochen',chase:'FLIEHE!',hiding:'Versteckt',escaping:'Raus hier!',outsideEnd:'Am Streifenwagen',ending:'Fall offen',dead:'Tot'};
 
 function ui(){
-  const m=document.getElementById('message'),p=document.getElementById('prompt'),
-    ph=document.getElementById('phase-text');
-  if(S.msg&&S.msgT>0){m.textContent=S.msg;m.style.display='block'}else m.style.display='none';
-  S.prompt=null;
+  if(S.msg&&S.msgT>0&&!S.inCloset){msgEl.textContent=S.msg;msgEl.style.display='block'}else msgEl.style.display='none';
+  let pr=null;
   if(!S.over){
-    if(dist(P.closet)<32&&S.phase==='chase')S.prompt='E: Im Schrank verstecken';
-    else if(S.inCloset&&S.killerLeft)S.prompt='E: Herauskommen';
-    else if(dist(P.lockedDoor)<50&&S.phase==='exploring')S.prompt='E: Tür untersuchen';
-    else if(dist(P.lockedDoor)<50&&S.phase==='sawBlood')S.prompt='E: Tür EINTRETEN';
-    else if(dist(P.car)<45&&S.phase==='outsideEnd')S.prompt='E: Verstärkung rufen'}
-  if(S.prompt){p.textContent=S.prompt;p.style.display='block'}else p.style.display='none';
-  const lab={outside:'Ankunft',exploring:'Durchsuche das Haus',sawBlood:'Blutspur entdeckt',
-    breaking:'Tür aufgebrochen',chase:'FLIEHE!',hiding:'Versteckt',
-    escaping:'Raus hier!',outsideEnd:'Am Streifenwagen',ending:'Fall offen',dead:'Tot'};
-  ph.textContent=lab[S.phase]||S.phase}
+    if(D(P.closet)<1.2&&S.phase==='chase')pr='[E] Im Schrank verstecken';
+    else if(S.inCloset&&S.killerLeft)pr='[E] Herauskommen';
+    else if(D(P.lockedDoor)<2&&S.phase==='exploring')pr='[E] Tür untersuchen';
+    else if(D(P.lockedDoor)<2&&S.phase==='sawBlood')pr='[E] Tür EINTRETEN';
+    else if(D(P.car)<2&&S.phase==='outsideEnd')pr='[E] Verstärkung rufen';
+  }
+  if(pr){promptEl.textContent=pr;promptEl.style.display='block'}else promptEl.style.display='none';
+  phaseEl.textContent=labels[S.phase]||S.phase;
+  if(S.inCloset){closetEl.classList.add('active');
+    if(S.killerLeft){closetStat.textContent='Er ist weg. Drücke E zum Herauskommen.';hideFill.style.width='100%'}
+    else{closetStat.textContent='Halte still. Kein Geräusch. ('+S.hideTime.toFixed(1)+'s / '+S.needHide+'s)';hideFill.style.width=Math.min(100,(S.hideTime/S.needHide)*100)+'%'}
+  }else closetEl.classList.remove('active');
+}
 
-function loop(){
-  if(S.msgT>0)S.msgT--;
-  updPlayer();updKiller();
-  if(S.inCloset&&!S.killerLeft)S.hideTime+=1/60;
-  draw();ui();requestAnimationFrame(loop)}
-
-window.addEventListener('keydown',e=>{
-  const k=e.key.toLowerCase();S.keys[k]=true;
-  if(k==='e'||k===' ')interact();
-  if(['arrowup','arrowdown','arrowleft','arrowright',' '].includes(k))e.preventDefault()});
-window.addEventListener('keyup',e=>{S.keys[e.key.toLowerCase()]=false});
-document.getElementById('restart').addEventListener('click',()=>location.reload());
-
-msg("22:47 — Lindenstraße 13. Fahre zum Haus. WASD/Pfeile = laufen, E = interagieren.",360);
+function loop(){upd();rn.render(sc,cam);ui();requestAnimationFrame(loop)}
 loop();

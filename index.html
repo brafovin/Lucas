@@ -1,36 +1,37 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Der Fall im Haus - Ein Detektiv-Krimi</title>
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Der Fall im Haus - 3D</title>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="game-container">
-        <header>
-            <h1>Der Fall im Haus</h1>
-            <div id="status-bar">
-                <span>Phase: <span id="phase-text">Ankunft am Haus</span></span>
-                <span id="controls-hint">WASD / Pfeile = Bewegen · E / Leertaste = Interagieren</span>
-            </div>
-        </header>
-
-        <main>
-            <div id="canvas-wrap">
-                <canvas id="game"></canvas>
-                <div id="prompt"></div>
-                <div id="message"></div>
-                <div id="closet-ui"></div>
-            </div>
-        </main>
-
-        <footer>
-            <button id="restart">Neustart</button>
-            <div id="hint">Suche das Opfer. Durchsuche jedes Zimmer. Überlebe.</div>
-        </footer>
-    </div>
-
-    <script src="game.js"></script>
+<canvas id="game"></canvas>
+<div id="ui">
+  <div id="top-bar">
+    <span>DER FALL IM HAUS</span>
+    <span>Phase: <b id="phase">Ankunft</b></span>
+  </div>
+  <div id="crosshair">+</div>
+  <div id="message"></div>
+  <div id="prompt"></div>
+</div>
+<div id="closet-view">
+  <h2>Im Kleiderschrank</h2>
+  <p id="closet-status">Halte still. Kein Geräusch.</p>
+  <div id="hide-bar"><div id="hide-fill"></div></div>
+</div>
+<div id="start-overlay">
+  <div class="menu">
+    <h1>Der Fall im Haus</h1>
+    <p class="sub">Ein Detektiv-Krimi in 3D</p>
+    <p class="controls">WASD = Laufen · Maus = Umschauen · E = Interagieren · ESC = Pause</p>
+    <button id="start-btn">KLICKEN ZUM STARTEN</button>
+    <p class="hint">Finde die Person, die angerufen hat. Überlebe die Nacht.</p>
+  </div>
+</div>
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="game.js"></script>
 </body>
 </html>
