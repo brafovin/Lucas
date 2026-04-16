@@ -2,22 +2,22 @@ const cv=document.getElementById('game');
 const rn=new THREE.WebGLRenderer({canvas:cv,antialias:false});
 rn.setPixelRatio(window.devicePixelRatio);rn.setSize(innerWidth,innerHeight);
 const sc=new THREE.Scene();sc.background=new THREE.Color(0x000000);
-sc.fog=new THREE.Fog(0x000000,1,14);
+sc.fog=new THREE.Fog(0x000000,2,28);
 const cam=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,60);sc.add(cam);
-sc.add(new THREE.AmbientLight(0x0a0a12,0.6));
-const moon=new THREE.DirectionalLight(0x3344aa,0.25);moon.position.set(10,30,10);sc.add(moon);
-const fl=new THREE.SpotLight(0xfff1c0,3.5,13,Math.PI/7,0.45,1.6);
+sc.add(new THREE.AmbientLight(0x8a8880,1.2));
+const moon=new THREE.DirectionalLight(0x88aaff,0.8);moon.position.set(10,30,10);sc.add(moon);
+const fl=new THREE.SpotLight(0xfff1c0,6,22,Math.PI/5,0.4,1.2);
 cam.add(fl);fl.target.position.set(0,0,-1);cam.add(fl.target);
 
 const MAP=["#########################","#.......................#","#.......................#","#.......................#","############d############","#....#.........#........#","#....#.........#........#","#..............#........#","#....#..................#","#....#.........#........#","######.........##########","#.......................#","#.......................#","#.......................#","############D############","#.......................#","#.......................#","#.......................#","#########################"];
 const COLS=25,ROWS=19,H=3;
 
-const fMat=new THREE.MeshLambertMaterial({color:0x2b211a});
-const oMat=new THREE.MeshLambertMaterial({color:0x0a0d18});
-const bMat=new THREE.MeshLambertMaterial({color:0x2a1010});
-const cMat=new THREE.MeshLambertMaterial({color:0x1a1510});
-const wMat=new THREE.MeshLambertMaterial({color:0x5a5550});
-const dMat=new THREE.MeshLambertMaterial({color:0x3a1a0a});
+const fMat=new THREE.MeshLambertMaterial({color:0x6a5a44});
+const oMat=new THREE.MeshLambertMaterial({color:0x2a3050});
+const bMat=new THREE.MeshLambertMaterial({color:0x4a2222});
+const cMat=new THREE.MeshLambertMaterial({color:0x5a5044});
+const wMat=new THREE.MeshLambertMaterial({color:0xa09890});
+const dMat=new THREE.MeshLambertMaterial({color:0x7a4a1a});
 const pg=new THREE.PlaneGeometry(1,1);
 const bg=new THREE.BoxGeometry(1,H,1);
 
