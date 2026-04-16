@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Der Fall im Haus - Ein Detektiv-Krimi</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <header>
+            <h1 id="scene-title">Der Fall im Haus</h1>
+            <div id="status-bar">
+                <span id="health">Gesundheit: <span id="health-value">100</span></span>
+                <span id="location">Ort: <span id="location-value">Einsatzwagen</span></span>
+                <span id="time">Zeit: <span id="time-value">22:47</span></span>
+            </div>
+        </header>
+
+        <main>
+            <div id="scene-image" class="scene-image"></div>
+            <div id="story-text"></div>
+            <div id="choices"></div>
+        </main>
+
+        <footer>
+            <button id="restart-btn" onclick="restartGame()" style="display:none;">Neustart</button>
+            <div id="inventory">Ausrüstung: <span id="inventory-items">Dienstwaffe, Taschenlampe, Funkgerät</span></div>
+        </footer>
+    </div>
+
+    <audio id="ambient" loop>
+        <source src="" type="audio/mpeg">
+    </audio>
+
+    <script src="game.js"></script>
+</body>
+</html>
