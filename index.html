@@ -9,29 +9,27 @@
 <body>
     <div id="game-container">
         <header>
-            <h1 id="scene-title">Der Fall im Haus</h1>
+            <h1>Der Fall im Haus</h1>
             <div id="status-bar">
-                <span id="health">Gesundheit: <span id="health-value">100</span></span>
-                <span id="location">Ort: <span id="location-value">Einsatzwagen</span></span>
-                <span id="time">Zeit: <span id="time-value">22:47</span></span>
+                <span>Phase: <span id="phase-text">Ankunft am Haus</span></span>
+                <span id="controls-hint">WASD / Pfeile = Bewegen · E / Leertaste = Interagieren</span>
             </div>
         </header>
 
         <main>
-            <div id="scene-image" class="scene-image"></div>
-            <div id="story-text"></div>
-            <div id="choices"></div>
+            <div id="canvas-wrap">
+                <canvas id="game"></canvas>
+                <div id="prompt"></div>
+                <div id="message"></div>
+                <div id="closet-ui"></div>
+            </div>
         </main>
 
         <footer>
-            <button id="restart-btn" onclick="restartGame()" style="display:none;">Neustart</button>
-            <div id="inventory">Ausrüstung: <span id="inventory-items">Dienstwaffe, Taschenlampe, Funkgerät</span></div>
+            <button id="restart">Neustart</button>
+            <div id="hint">Suche das Opfer. Durchsuche jedes Zimmer. Überlebe.</div>
         </footer>
     </div>
-
-    <audio id="ambient" loop>
-        <source src="" type="audio/mpeg">
-    </audio>
 
     <script src="game.js"></script>
 </body>

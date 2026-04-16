@@ -1,33 +1,40 @@
 # Der Fall im Haus
 
-Ein atmosphärisches Text-Adventure im Detektiv-/Krimi-Stil.
-
-## Story
-
-Du bist ein Polizeibeamter, der zu einem anonymen Notruf in ein einsames Haus
-gerufen wird. Als du ankommst, ist niemand zu sehen — doch als du das Haus
-durchsuchst, entdeckst du eine verschlossene Tür mit einer Blutspur. Was dahinter
-liegt, wird dich ein Katz-und-Maus-Spiel mit einem Killer kosten.
+Ein atmosphärisches Top-Down-Detektiv-Spiel im Browser. Du bist ein Polizist
+und läufst selbst durch ein leeres, dunkles Haus — mit Taschenlampe, Waffe
+und einer unheimlichen Ahnung.
 
 ## Spielen
 
-Einfach `index.html` im Browser öffnen.
+`index.html` im Browser öffnen.
 
-```
-xdg-open index.html     # Linux
-open index.html         # macOS
-start index.html        # Windows
-```
+## Steuerung
+
+| Taste | Aktion |
+|-------|--------|
+| WASD / Pfeiltasten | Laufen |
+| E / Leertaste | Interagieren (untersuchen, Tür eintreten, verstecken) |
+
+## Ablauf
+
+1. Fahre mit dem Streifenwagen zum Haus und betritt es durch die Haustür.
+2. Durchsuche Wohnzimmer, Küche und den Flur.
+3. Finde am Ende des Flurs die verschlossene Tür — und die Blutspur davor.
+4. Tritt die Tür ein und werde Zeuge des Mordes.
+5. Fliehe in den Kleiderschrank, bevor der Killer dich erwischt.
+6. Halte still, bis er das Haus verlassen hat.
+7. Renne zum Streifenwagen und rufe Verstärkung.
 
 ## Features
 
-- Mehrere Entscheidungspfade mit unterschiedlichen Enden
-- Atmosphärisches Design mit Typing-Effekt und Hintergrundstimmungen
-- Mehrere Game-Over-Szenarien, wenn du die falsche Wahl triffst
-- Ein "gutes" (aber beklemmendes) Ende, wenn du überlebst
+- Top-Down-Ansicht mit Kollision und Taschenlampen-Effekt (Fog of War)
+- Freies Erkunden mehrerer Zimmer
+- Echte Versteck-Mechanik mit Timer
+- Killer-KI mit Patrouillen- und Verfolgungsmodus
+- Mehrere mögliche Enden (Überleben oder Game Over)
 
 ## Dateien
 
-- `index.html` — HTML-Grundgerüst
-- `style.css` — Visuelles Design und Animationen
-- `game.js` — Spiellogik und Story-Inhalte
+- `index.html` — HTML-Grundgerüst mit Canvas
+- `style.css` — Dark-Krimi-Design
+- `game.js` — Spiellogik (Bewegung, KI, Story, Rendering)
